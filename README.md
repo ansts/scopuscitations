@@ -1,1 +1,1 @@
-Script producing automated ciation report based on the Open Alex data base. 
+Script producing automated ciation report based on the Open Alex database. 
