@@ -1,0 +1,78 @@
+---
+title: "Справка за цитати"
+output: word_document
+date: "2025-09-15"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+# **Цитати на Анастас Пашов открити в базата данни OpenAlex.org без автоцитати на всички автори **
+
+```{r, include=FALSE}
+require(openalexR)
+require(parallel)
+require(pbapply)
+require(future.apply)
+require(reshape2)
+require(dplyr)
+require(rmarkdown)
+require(knitr)
+
+source("citform.R")
+
+options(openalexR.mailto = "a_pashov@microbio.bas.bg")
+Q="Anastas Pashov"
+my_profile <- oa_fetch(
+  entity = "authors",
+  display_name.search = Q
+)
+my_works <- oa_fetch(
+  entity = "works",
+  author.orcid = "0000-0002-6033-3566", 
+  verbose = TRUE
+)
+cits=lapply(my_works$id,\(id) {
+  citing_works <- oa_fetch(
+    entity = "works",
+    cites = id,  
+    publication_year = "1993-2025",
+    count_only = FALSE
+  )
+})
+
+noncits=which(lengths(cits)==0)
+my_works=my_works[-noncits,]
+cits=cits[-noncits]
+
+theList0=pblapply(my_works$id,\(id){
+    j=my_works$id==id
+    # print(id)
+    auth=my_works$authorships[j][[1]]$display_name
+    dn=lapply(cits[j][[1]]$authorships,\(cja) cja$display_name)
+    authocit=unique(unlist(lapply(auth, \(ai) grep(ai,dn))))
+    if (nrow(cits[j][[1]])==0) return(NA)
+    cj=cits[j][[1]][-authocit,]
+    if (nrow(cj)==0) return(NA)
+    citlist=apply(cj,1, citform)
+    myref=my_works[my_works$id==id,]
+    list(citform(myref, fl=F),"цитирана в: ",citlist)
+})
+  
+theList0=theList0[!is.na(theList0)]
+n=sapply(theList0,\(l) length(l[[3]])) 
+
+```
+## (общо `r sum(n)` )
+
+```{r results='asis'}
+for (l in theList0){
+  cat('\n\n', unlist(l[[1]]))
+  cat('\n\n', unlist(l[[2]]))
+  for (i in seq_along(l[[3]])) {
+    ll=l[[3]][[i]]
+    cat('\n\n', paste(i,ll, sep = "."))
+  }
+}
+```
